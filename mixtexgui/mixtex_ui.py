@@ -30,7 +30,7 @@ class MixTeXApp:
         self.root.wm_attributes('-topmost', 1)
         self.root.attributes('-alpha', 0.85)
         self.TRANSCOLOUR = '#a9abc6'
-        self.root.wm_attributes("-transparentcolor", self.TRANSCOLOUR)
+        self.is_only_parse_when_show = False
         self.icon = Image.open(os.path.join(base_path, "icon.png"))
         self.icon_tk = ImageTk.PhotoImage(self.icon)
 
@@ -59,7 +59,7 @@ class MixTeXApp:
         self.output = None
         if not os.path.exists(self.data_folder):
             os.makedirs(self.data_folder)
-        
+
         if not os.path.exists(self.metadata_file):
             with open(self.metadata_file, 'w', newline='', encoding='utf-8') as f:
                 writer = csv.writer(f)
@@ -76,6 +76,11 @@ class MixTeXApp:
         self.menu.add_command(label="关于", command=self.show_about)
         self.menu.add_command(label="打赏", command=self.show_donate)
         self.menu.add_command(label="退出", command=self.quit)
+        if sys.platform == 'darwin':  # macOS
+            self.root.config(menu=self.menu)
+        else:  # Windows/Linux
+            self.root.bind('<Button-3>', self.show_menu)
+            self.root.wm_attributes("-transparentcolor", self.TRANSCOLOUR)
 
         self.create_tray_icon()
 
@@ -106,22 +111,22 @@ class MixTeXApp:
         file_name = f"{int(time.time())}.png"
         file_path = os.path.join(self.data_folder, file_name)
         image.save(file_path, 'PNG')
-        
+
         rows = []
         with open(self.metadata_file, 'r', newline='', encoding='utf-8') as f:
             reader = csv.reader(f)
             rows = list(reader)
-        
+
         updated = False
         for row in rows[1:]:
             if row[1] == text:
                 row[2] = feedback
                 updated = True
                 break
-        
+
         if not updated:
             rows.append([file_name, text, feedback])
-        
+
         with open(self.metadata_file, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             writer.writerows(rows)
@@ -290,7 +295,7 @@ class MixTeXApp:
                 if next_token_id == tokenizer.eos_token_id:
                     self.log('\n===成功复制到剪切板===\n')
                     break
-                
+
                 decoder_inputs.update({
                     "input_ids": next_token_id[:, None],
                     **{f"past_key_values.{i}.{t}": decoder_outputs[i*2+1+j] 
@@ -361,7 +366,7 @@ class MixTeXApp:
         self.icon_tk = ImageTk.PhotoImage(self.icon)
         self.icon_label.config(image=self.icon_tk)
         self.tray_icon.icon = self.icon
-        
+
     def log(self, message, end='\n'):
         self.text_box.insert(tk.END, message + end)
         self.text_box.see(tk.END)
