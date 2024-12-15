@@ -15,8 +15,8 @@ MixTeX is an innovative multimodal LaTeX recognition mini-program, independently
 
 1. Navigate to the `mixtexgui` directory: `cd mixtexgui`
 2. Create a new Conda environment: `conda create -n mixtex python=3.10.14`
-3. Run `pip install -r requirements.txt`
-4. Activate the environment: `conda activate mixtex`
+3. Activate the environment: `conda activate mixtex`
+4. Run `pip install -r requirements.txt`
 5. Build the application with PyInstaller: `pyinstaller mixtex_ui.spec`
 6. If possible, could everyone please submit the packaged programs from other platforms to GitHub? Thank you for your support!
 
