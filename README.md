@@ -4,6 +4,7 @@
 <a href="https://colab.research.google.com/github/RQLuo/MixTeX/blob/main/MixTex_Demo.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
 [![Hugging Face Spaces](https://img.shields.io/badge/🤗%20Hugging%20Face-Community%20Space-blue)](https://huggingface.co/MixTex/ZhEn-Latex-OCR)
 [![Demo Video](https://img.shields.io/badge/📺%20Demo-Video%20-white)](https://www.youtube.com/watch?v=PqQdQ5xT-vk)
+![image](https://github.com/user-attachments/assets/05775c1a-ebb1-4f57-a619-189c36d9bc1f)
 
 ## Online Demo: https://mineai.top/
 
