@@ -15,6 +15,7 @@ import sys
 import os
 import csv
 import re
+import ctypes
 
 if hasattr(sys, '_MEIPASS'):
     base_path = sys._MEIPASS
@@ -24,6 +25,16 @@ else:
 class MixTeXApp:
     def __init__(self, root):
         self.root = root
+        
+        # 添加 DPI 感知支持 (解决高分屏模糊问题)
+        try:
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)  # 启用 DPI 感知
+            self.dpi_scale = ctypes.windll.shcore.GetScaleFactorForDevice(0) / 100
+            self.root.tk.call('tk', 'scaling', self.dpi_scale)
+        except Exception as e:
+            print(f"DPI 设置失败: {e}")
+            self.dpi_scale = 1.0
+        
         self.root.title('MixTeX')
         self.root.resizable(False, False)
         self.root.overrideredirect(True)
@@ -31,20 +42,23 @@ class MixTeXApp:
         self.root.attributes('-alpha', 0.85)
         self.TRANSCOLOUR = '#a9abc6'
         self.is_only_parse_when_show = False
-        self.icon = Image.open(os.path.join(base_path, "icon.png"))
+        self.icon = self.load_scaled_image(os.path.join(base_path, "icon.png"))
         self.icon_tk = ImageTk.PhotoImage(self.icon)
 
         self.main_frame = tk.Frame(self.root, bg=self.TRANSCOLOUR)
         self.main_frame.pack(fill=tk.BOTH, expand=True)
 
         self.icon_label = tk.Label(self.main_frame, image=self.icon_tk, bg=self.TRANSCOLOUR)
-        self.icon_label.pack(pady=10)
+        self.icon_label.pack(pady=self.scale_size(10))
 
         self.text_frame = tk.Frame(self.main_frame, bg='white', bd=1, relief=tk.SOLID)
-        self.text_frame.pack(padx=5, pady=5, fill=tk.BOTH, expand=True)
+        self.text_frame.pack(padx=self.scale_size(5), pady=self.scale_size(5), fill=tk.BOTH, expand=True)
 
-        self.text_box = tk.Text(self.text_frame, wrap=tk.WORD, bg='white', fg='black', height=6, width=30)
-        self.text_box.pack(padx=2, pady=2, fill=tk.BOTH, expand=True)
+        # 使用缩放后的字体大小
+        font_size = self.scale_size(9)
+        self.text_box = tk.Text(self.text_frame, wrap=tk.WORD, bg='white', fg='black', 
+                               height=6, width=30, font=('Arial', font_size))
+        self.text_box.pack(padx=self.scale_size(2), pady=self.scale_size(2), fill=tk.BOTH, expand=True)
 
         self.icon_label.bind('<ButtonPress-1>', self.start_move)
         self.icon_label.bind('<B1-Motion>', self.do_move)
@@ -85,13 +99,47 @@ class MixTeXApp:
         self.create_tray_icon()
 
         self.model = self.load_model('onnx')
-
-        self.ocr_thread = threading.Thread(target=self.ocr_loop, daemon=True)
-        self.ocr_thread.start()
+        if self.model is None:
+            self.log("模型加载失败，部分功能将不可用")
+            self.ocr_paused = True  # 暂停OCR功能
+        else:
+            self.ocr_thread = threading.Thread(target=self.ocr_loop, daemon=True)
+            self.ocr_thread.start()
 
         self.donate_window = None
 
         self.is_only_parse_when_show = False
+    
+    def scale_size(self, size):
+        """根据DPI缩放尺寸"""
+        return int(size * self.dpi_scale)
+    
+    def load_scaled_image(self, image_path, custom_scale=None):
+        """按DPI比例加载图像"""
+        # 使用自定义缩放因子或系统DPI缩放
+        scale = custom_scale if custom_scale is not None else getattr(self, 'dpi_scale', 1.0)
+        
+        # 确保路径存在
+        if not os.path.exists(image_path):
+            # 尝试查找替代路径
+            alt_path = os.path.join(os.path.dirname(sys.executable), os.path.basename(image_path))
+            if os.path.exists(alt_path):
+                image_path = alt_path
+            else:
+                print(f"找不到图像文件: {image_path}")
+                # 创建一个空白图像替代
+                return Image.new('RGB', (64, 64), (200, 200, 200))
+        
+        # 加载原始图像
+        original = Image.open(image_path)
+        
+        # 如果需要缩放
+        if scale > 1.0:
+            # 计算新尺寸
+            new_size = (int(original.width * scale), int(original.height * scale))
+            # 使用高质量缩放
+            return original.resize(new_size, Image.LANCZOS)
+        return original
 
     def start_move(self, event):
         self.x = event.x
@@ -152,17 +200,26 @@ class MixTeXApp:
         self.text_box.insert(tk.END, donate_text)
 
         donate_frame = tk.Frame(self.main_frame, bg='white')
-        donate_frame.pack(padx=5, pady=5, fill=tk.BOTH, expand=True)
+        donate_frame.pack(padx=self.scale_size(5), pady=self.scale_size(5), fill=tk.BOTH, expand=True)
 
-        donate_image = Image.open(os.path.join(base_path, "donate.png")).resize((400,400))
+        # 加载并缩放打赏图像
+        donate_size = self.scale_size(400)
+        donate_image = self.load_scaled_image(os.path.join(base_path, "donate.png"))
+        donate_image = donate_image.resize((donate_size, donate_size), Image.LANCZOS)
         donate_photo = ImageTk.PhotoImage(donate_image)
 
         image_label = tk.Label(donate_frame, image=donate_photo)
         image_label.image = donate_photo
         image_label.pack(expand=True, fill=tk.BOTH)
 
-        close_button = tk.Button(donate_frame, text="☒", command=lambda: donate_frame.destroy())
-        close_button.place(relx=1.0, rely=0.0, x=-15, y=5, width=12, height=12, anchor="ne")
+        close_button = tk.Button(donate_frame, text="☒", 
+                                command=lambda: donate_frame.destroy())
+        close_button.place(relx=1.0, rely=0.0, 
+                          x=-self.scale_size(15), 
+                          y=self.scale_size(5), 
+                          width=self.scale_size(12), 
+                          height=self.scale_size(12), 
+                          anchor="ne")
 
     def quit(self):
         self.tray_icon.stop()
@@ -170,6 +227,7 @@ class MixTeXApp:
 
     def only_parse_when_show(self):
         self.is_only_parse_when_show = not self.is_only_parse_when_show
+        
     def create_tray_icon(self):
         menu = pystray.Menu(
             item('显示', self.show_window),
@@ -186,15 +244,37 @@ class MixTeXApp:
 
     def load_model(self, path):
         try:
+            # 检查模型文件是否存在
+            required_files = [
+                os.path.join(path, "encoder_model.onnx"),
+                os.path.join(path, "decoder_model_merged.onnx"),
+                os.path.join(path, "tokenizer.json"),
+                os.path.join(path, "vocab.json")
+            ]
+            
+            for file_path in required_files:
+                if not os.path.exists(file_path):
+                    self.log(f"缺少必要的模型文件: {file_path}")
+                    # 显示错误对话框
+                    import ctypes
+                    ctypes.windll.user32.MessageBoxW(0, 
+                        f"缺少必要的模型文件: {os.path.basename(file_path)}\n请确保 onnx 文件夹包含完整的模型文件。", 
+                        "模型加载错误", 0)
+                    return None
+                    
             tokenizer = AutoTokenizer.from_pretrained(path)
             feature_extractor = AutoImageProcessor.from_pretrained(path)
             encoder_session = ort.InferenceSession(f"{path}/encoder_model.onnx")
             decoder_session = ort.InferenceSession(f"{path}/decoder_model_merged.onnx")
             self.log('\n===成功加载模型===\n')
+            return (tokenizer, feature_extractor, encoder_session, decoder_session)
         except Exception as e:
-            self.log(f"Error loading models or tokenizer: {e}")
-            exit(1)
-        return (tokenizer, feature_extractor, encoder_session, decoder_session)
+            self.log(f"模型加载失败: {e}")
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(0, 
+                f"模型加载失败: {str(e)}\n请确保 onnx 文件夹包含完整的模型文件。", 
+                "模型加载错误", 0)
+            return None
 
     def show_feedback_options(self):
         feedback_menu = tk.Menu(self.menu, tearoff=0)
@@ -228,13 +308,15 @@ class MixTeXApp:
 
         self.update_annotation_position()
 
-        entry = tk.Entry(self.annotation_window, width=45, font=('Arial', 11))
-        entry.pack(padx=10, pady=10)
+        # 使用缩放后的字体
+        font_size = self.scale_size(11)
+        entry = tk.Entry(self.annotation_window, width=45, font=('Arial', font_size))
+        entry.pack(padx=self.scale_size(10), pady=self.scale_size(10))
         entry.focus_set()
 
         confirm_button = tk.Button(self.annotation_window, text="确认",
                                    command=lambda: self.confirm_annotation(entry))
-        confirm_button.pack(pady=(0, 10))
+        confirm_button.pack(pady=(0, self.scale_size(10)))
 
         # Close the window on moving the main window
         self.root.bind('<Configure>', lambda e: self.update_annotation_position())
@@ -252,8 +334,8 @@ class MixTeXApp:
 
     def update_annotation_position(self):
         if self.annotation_window:
-            x = self.root.winfo_x() + 10
-            y = self.root.winfo_y() + self.root.winfo_height() + 10
+            x = self.root.winfo_x() + self.scale_size(10)
+            y = self.root.winfo_y() + self.root.winfo_height() + self.scale_size(10)
             self.annotation_window.geometry(f"+{x}+{y}")
 
     def close_annotation(self):
@@ -276,6 +358,10 @@ class MixTeXApp:
             head_size = hidden_size // num_attention_heads
             inputs = feature_extractor(self.current_image, return_tensors="np").pixel_values
             encoder_outputs = encoder_session.run(None, {"pixel_values": inputs})[0]
+            
+         
+            num_layers = 6  # 修改为6层而不是3层
+            
             decoder_inputs = {
                 "input_ids": tokenizer("<s>", return_tensors="np").input_ids.astype(np.int64),
                 "encoder_hidden_states": encoder_outputs,
@@ -359,9 +445,9 @@ class MixTeXApp:
 
     def update_icon(self):
         if self.ocr_paused:
-            new_icon = Image.open(os.path.join(base_path, "icon_gray.png"))
+            new_icon = self.load_scaled_image(os.path.join(base_path, "icon_gray.png"))
         else:
-            new_icon = Image.open(os.path.join(base_path, "icon.png"))
+            new_icon = self.load_scaled_image(os.path.join(base_path, "icon.png"))
         self.icon = new_icon
         self.icon_tk = ImageTk.PhotoImage(self.icon)
         self.icon_label.config(image=self.icon_tk)
@@ -372,6 +458,16 @@ class MixTeXApp:
         self.text_box.see(tk.END)
 
 if __name__ == '__main__':
-    root = tk.Tk()
-    app = MixTeXApp(root)
-    root.mainloop()
+    try:
+        root = tk.Tk()
+        app = MixTeXApp(root)
+        root.mainloop()
+    except Exception as e:
+        # 创建错误日志文件
+        with open('error_log.txt', 'w') as f:
+            import traceback
+            f.write(str(e) + '\n')
+            f.write(traceback.format_exc())
+        # 显示错误窗口
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(0, f"程序启动失败: {str(e)}\n详细信息已保存到error_log.txt", "错误", 0)
