@@ -5,7 +5,7 @@ from PIL import Image, ImageTk
 import pystray
 from pystray import MenuItem as item
 import threading
-from transformers import AutoTokenizer, AutoImageProcessor
+from transformers import RobertaTokenizer, ViTImageProcessor
 import onnxruntime as ort
 import numpy as np
 from PIL import ImageGrab
@@ -244,35 +244,51 @@ class MixTeXApp:
 
     def load_model(self, path):
         try:
-            # 检查模型文件是否存在
-            required_files = [
-                os.path.join(path, "encoder_model.onnx"),
-                os.path.join(path, "decoder_model_merged.onnx"),
-                os.path.join(path, "tokenizer.json"),
-                os.path.join(path, "vocab.json")
+            # 检查模型文件是否存在，优先查找外部onnx文件夹
+            model_paths = [
+                path,  # 原始路径（相对路径）
+                os.path.join(os.path.dirname(sys.executable), 'onnx'),  # exe同目录下的onnx文件夹
+                os.path.abspath("onnx")  # 当前运行目录下的onnx文件夹
             ]
             
-            for file_path in required_files:
-                if not os.path.exists(file_path):
-                    self.log(f"缺少必要的模型文件: {file_path}")
-                    # 显示错误对话框
-                    import ctypes
-                    ctypes.windll.user32.MessageBoxW(0, 
-                        f"缺少必要的模型文件: {os.path.basename(file_path)}\n请确保 onnx 文件夹包含完整的模型文件。", 
-                        "模型加载错误", 0)
-                    return None
+            # 寻找第一个有效的模型路径
+            valid_path = None
+            for model_path in model_paths:
+                if os.path.exists(model_path):
+                    # 检查必要文件是否都存在
+                    required_files = [
+                        os.path.join(model_path, "encoder_model.onnx"),
+                        os.path.join(model_path, "decoder_model_merged.onnx"),
+                        os.path.join(model_path, "tokenizer.json"),
+                        os.path.join(model_path, "vocab.json")
+                    ]
                     
-            tokenizer = AutoTokenizer.from_pretrained(path)
-            feature_extractor = AutoImageProcessor.from_pretrained(path)
-            encoder_session = ort.InferenceSession(f"{path}/encoder_model.onnx")
-            decoder_session = ort.InferenceSession(f"{path}/decoder_model_merged.onnx")
+                    all_files_exist = all(os.path.exists(file_path) for file_path in required_files)
+                    if all_files_exist:
+                        valid_path = model_path
+                        self.log(f"使用模型路径: {valid_path}")
+                        break
+            
+            if valid_path is None:
+                self.log("找不到有效的模型文件")
+                # 显示错误对话框
+                import ctypes
+                ctypes.windll.user32.MessageBoxW(0, 
+                    "找不到必要的模型文件\n请确保exe同目录下的onnx文件夹包含完整的模型文件。", 
+                    "模型加载错误", 0)
+                return None
+                    
+            tokenizer = RobertaTokenizer.from_pretrained(valid_path)
+            feature_extractor = ViTImageProcessor.from_pretrained(valid_path)
+            encoder_session = ort.InferenceSession(f"{valid_path}/encoder_model.onnx")
+            decoder_session = ort.InferenceSession(f"{valid_path}/decoder_model_merged.onnx")
             self.log('\n===成功加载模型===\n')
             return (tokenizer, feature_extractor, encoder_session, decoder_session)
         except Exception as e:
             self.log(f"模型加载失败: {e}")
             import ctypes
             ctypes.windll.user32.MessageBoxW(0, 
-                f"模型加载失败: {str(e)}\n请确保 onnx 文件夹包含完整的模型文件。", 
+                f"模型加载失败: {str(e)}\n请确保exe同目录下的onnx文件夹包含完整的模型文件。", 
                 "模型加载错误", 0)
             return None
 

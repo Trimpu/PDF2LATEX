@@ -24,7 +24,7 @@ manifest_path = 'app.manifest'
 with open(manifest_path, 'w') as f:
     f.write(manifest)
 
-# 修改 spec 文件，添加缺失的依赖
+# 修改 Analysis 配置部分
 a = Analysis(
     ['mixtex_ui.py'],
     pathex=[],
@@ -33,11 +33,48 @@ a = Analysis(
         ('donate.png', '.'), 
         ('icon.png', '.'), 
         ('icon_gray.png', '.'),
-        ('onnx', 'onnx')  # 确保包含整个onnx文件夹
+    ],
+    excludes = [
+        # 完全排除 PyTorch 相关库，因为使用ONNX运行时
+        'torch', 'torchvision', 'torchaudio',
+        
+        # 排除其他机器学习框架
+        'tensorflow',
+        'jax',
+        'flax',
+        'keras',
+        
+        # 排除训练相关模块
+        'transformers.trainer',
+        'transformers.training_args',
     ],
     hiddenimports=[
-        'onnxruntime',
+        # transformers 基础模块
         'transformers',
+        'transformers.models',
+        'transformers.models.roberta',
+        'transformers.models.vit',
+
+        # === RoBERTa 必要模块 ===
+        'transformers.models.roberta.tokenization_roberta',
+        'transformers.models.roberta.tokenization_roberta_fast',
+        
+        # === ViT 必要模块 ===
+        'transformers.models.vit.image_processing_vit',
+        
+        # === 通用工具类 ===
+        'transformers.tokenization_utils',
+        'transformers.tokenization_utils_base',
+        'transformers.image_processing_utils',
+        'transformers.image_utils',
+        'transformers.configuration_utils',
+        'transformers.utils',
+        'transformers.file_utils',
+        'transformers.modeling_utils',
+        
+        # === ONNX 运行时依赖 ===
+        'onnxruntime',
+        'onnxruntime.capi.onnxruntime_pybind11_state',
         'PIL',
         'pystray',
         'numpy',
@@ -45,7 +82,6 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
     noarchive=False,
     optimize=0,
 )
