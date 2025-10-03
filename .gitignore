@@ -170,6 +170,32 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-mixtexgui/dist
-mixtexgui/build
-onnx/
+# MixTeX specific files
+mixtexgui/dist/
+mixtexgui/build/
+
+# Node.js dependencies (regenerated with npm install)
+node_modules/
+PDF/node_modules/
+*/node_modules/
+
+# React build files  
+PDF/build/
+*/build/
+
+# Cache directories
+.cache/
+*/.cache/
+*/cache/
+
+# IDE files
+.vscode/settings.json
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp

@@ -24,7 +24,7 @@ def pad_image(img, out_size=(448, 448)):
     else:
         scale = min(x_img / w, y_img / h)
         nw, nh = int(w * scale), int(h * scale)
-        img_resized = img.resize((nw, nh), Image.LANCZOS)
+        img_resized = img.resize((nw, nh), Image.Resampling.LANCZOS)
         x = (x_img - nw) // 2
         y = (y_img - nh) // 2
         bg.paste(img_resized, (x, y))
@@ -47,7 +47,7 @@ def convert_align_to_equations(text):
 
 
 def stream_inference(
-    image, model, max_length=512, num_layers=3, hidden_size=768, heads=12, batch_size=1
+    image, model, max_length=512, num_layers=6, hidden_size=768, heads=12, batch_size=1
 ):
     tokenizer, feature_extractor, enc_session, dec_session = model
     head_size = hidden_size // heads

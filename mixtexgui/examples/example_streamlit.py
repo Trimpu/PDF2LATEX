@@ -13,24 +13,27 @@ from PIL import ImageGrab
 def main():
     st.set_page_config(page_title="MixTeX LaTeX OCR", page_icon="../icon.ico")
     st.title("MixTeX LaTeX OCR")
-    model = load_model("onnx")
+    import os
+    # Get the absolute path to the onnx folder
+    onnx_path = os.path.join(os.path.dirname(__file__), "..", "onnx")
+    model = load_model(onnx_path)
 
-    uploaded_file = st.file_uploader("选择图片文件", type=["png", "jpg", "jpeg"])
+    uploaded_file = st.file_uploader("Choose image file", type=["png", "jpg", "jpeg"])
 
-    if st.button("从剪贴板粘贴图片"):
+    if st.button("Paste image from clipboard"):
         try:
             img = ImageGrab.grabclipboard()
             if img:
-                st.image(img, caption="剪贴板图片预览")
+                st.image(img, caption="Clipboard image preview")
                 run_inference(model, img)
             else:
-                st.warning("剪贴板没有可用图片")
+                st.warning("No image available in clipboard")
         except Exception as e:
             st.error(str(e))
 
     if uploaded_file:
         img = Image.open(uploaded_file).convert("RGB")
-        st.image(img, caption="上传图片预览")
+        st.image(img, caption="Uploaded image preview")
         run_inference(model, img)
 
 

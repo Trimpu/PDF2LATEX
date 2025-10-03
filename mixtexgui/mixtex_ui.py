@@ -18,7 +18,7 @@ import re
 import ctypes
 
 if hasattr(sys, '_MEIPASS'):
-    base_path = sys._MEIPASS
+    base_path = sys._MEIPASS  # type: ignore # PyInstaller attribute
 else:
     base_path = os.path.abspath(".")
 
@@ -82,14 +82,14 @@ class MixTeXApp:
         # Create the menu
         self.menu = tk.Menu(self.root, tearoff=0)
         settings_menu = tk.Menu(self.menu, tearoff=0)
-        settings_menu.add_checkbutton(label="$ 公式 $", onvalue=1, offvalue=0, command=self.toggle_latex_replacement, variable=tk.BooleanVar(value=self.use_dollars_for_inline_math))
-        settings_menu.add_checkbutton(label="$$ 单行公式 $$", onvalue=1, offvalue=0, command=self.toggle_convert_align_to_equations, variable=tk.BooleanVar(value=self.convert_align_to_equations_enabled))
-        self.menu.add_cascade(label="设置", menu=settings_menu)
-        self.menu.add_command(label="反馈标注", command=self.show_feedback_options)
-        self.menu.add_command(label="最小化", command=self.minimize)
-        self.menu.add_command(label="关于", command=self.show_about)
-        self.menu.add_command(label="打赏", command=self.show_donate)
-        self.menu.add_command(label="退出", command=self.quit)
+        settings_menu.add_checkbutton(label="$ Inline Math $", onvalue=1, offvalue=0, command=self.toggle_latex_replacement, variable=tk.BooleanVar(value=self.use_dollars_for_inline_math))
+        settings_menu.add_checkbutton(label="$$ Single Line Formula $$", onvalue=1, offvalue=0, command=self.toggle_convert_align_to_equations, variable=tk.BooleanVar(value=self.convert_align_to_equations_enabled))
+        self.menu.add_cascade(label="Settings", menu=settings_menu)
+        self.menu.add_command(label="Feedback", command=self.show_feedback_options)
+        self.menu.add_command(label="Minimize", command=self.minimize)
+        self.menu.add_command(label="About", command=self.show_about)
+        self.menu.add_command(label="Donate", command=self.show_donate)
+        self.menu.add_command(label="Exit", command=self.quit)
         if sys.platform == 'darwin':  # macOS
             self.root.config(menu=self.menu)
         else:  # Windows/Linux
@@ -100,8 +100,8 @@ class MixTeXApp:
 
         self.model = self.load_model('onnx')
         if self.model is None:
-            self.log("模型加载失败，部分功能将不可用")
-            self.ocr_paused = True  # 暂停OCR功能
+            self.log("Model loading failed, some features will be unavailable")
+            self.ocr_paused = True  # Pause OCR functionality
         else:
             self.ocr_thread = threading.Thread(target=self.ocr_loop, daemon=True)
             self.ocr_thread.start()
@@ -138,7 +138,7 @@ class MixTeXApp:
             # 计算新尺寸
             new_size = (int(original.width * scale), int(original.height * scale))
             # 使用高质量缩放
-            return original.resize(new_size, Image.LANCZOS)
+            return original.resize(new_size, Image.Resampling.LANCZOS)
         return original
 
     def start_move(self, event):
@@ -205,11 +205,11 @@ class MixTeXApp:
         # 加载并缩放打赏图像
         donate_size = self.scale_size(400)
         donate_image = self.load_scaled_image(os.path.join(base_path, "donate.png"))
-        donate_image = donate_image.resize((donate_size, donate_size), Image.LANCZOS)
+        donate_image = donate_image.resize((donate_size, donate_size), Image.Resampling.LANCZOS)
         donate_photo = ImageTk.PhotoImage(donate_image)
 
         image_label = tk.Label(donate_frame, image=donate_photo)
-        image_label.image = donate_photo
+        image_label.image = donate_photo  # type: ignore # Keep reference to prevent garbage collection
         image_label.pack(expand=True, fill=tk.BOTH)
 
         close_button = tk.Button(donate_frame, text="☒", 
@@ -230,9 +230,9 @@ class MixTeXApp:
         
     def create_tray_icon(self):
         menu = pystray.Menu(
-            item('显示', self.show_window),
-            item("开关只在最大化启用", self.only_parse_when_show),
-            item('退出', self.quit)
+            item('Show', self.show_window),
+            item("Toggle Parse Only When Maximized", self.only_parse_when_show),
+            item('Exit', self.quit)
         )
 
         self.tray_icon = pystray.Icon("MixTeX", self.icon, "MixTeX", menu)
@@ -266,26 +266,26 @@ class MixTeXApp:
                     all_files_exist = all(os.path.exists(file_path) for file_path in required_files)
                     if all_files_exist:
                         valid_path = model_path
-                        self.log(f"使用模型路径: {valid_path}")
+                        self.log(f"Using model path: {valid_path}")
                         break
             
             if valid_path is None:
-                self.log("找不到有效的模型文件")
-                # 显示错误对话框
+                self.log("Cannot find valid model files")
+                # Show error dialog
                 import ctypes
                 ctypes.windll.user32.MessageBoxW(0, 
-                    "找不到必要的模型文件\n请确保exe同目录下的onnx文件夹包含完整的模型文件。", 
-                    "模型加载错误", 0)
+                    "Cannot find required model files\nPlease ensure the onnx folder in the exe directory contains complete model files.", 
+                    "Model Loading Error", 0)
                 return None
                     
             tokenizer = RobertaTokenizer.from_pretrained(valid_path)
             feature_extractor = ViTImageProcessor.from_pretrained(valid_path)
             encoder_session = ort.InferenceSession(f"{valid_path}/encoder_model.onnx")
             decoder_session = ort.InferenceSession(f"{valid_path}/decoder_model_merged.onnx")
-            self.log('\n===成功加载模型===\n')
+            self.log('\n===Model loaded successfully===\n')
             return (tokenizer, feature_extractor, encoder_session, decoder_session)
         except Exception as e:
-            self.log(f"模型加载失败: {e}")
+            self.log(f"Model loading failed: {e}")
             import ctypes
             ctypes.windll.user32.MessageBoxW(0, 
                 f"模型加载失败: {str(e)}\n请确保exe同目录下的onnx文件夹包含完整的模型文件。", 
@@ -294,11 +294,11 @@ class MixTeXApp:
 
     def show_feedback_options(self):
         feedback_menu = tk.Menu(self.menu, tearoff=0)
-        feedback_menu.add_command(label="完美", command=lambda: self.handle_feedback("Perfect"))
-        feedback_menu.add_command(label="普通", command=lambda: self.handle_feedback("Normal"))
-        feedback_menu.add_command(label="失误", command=lambda: self.handle_feedback("Mistake"))
-        feedback_menu.add_command(label="错误", command=lambda: self.handle_feedback("Error"))
-        feedback_menu.add_command(label="标注", command=self.add_annotation)
+        feedback_menu.add_command(label="Perfect", command=lambda: self.handle_feedback("Perfect"))
+        feedback_menu.add_command(label="Good", command=lambda: self.handle_feedback("Normal"))
+        feedback_menu.add_command(label="Mistake", command=lambda: self.handle_feedback("Mistake"))
+        feedback_menu.add_command(label="Error", command=lambda: self.handle_feedback("Error"))
+        feedback_menu.add_command(label="Annotate", command=self.add_annotation)
         feedback_menu.tk_popup(self.root.winfo_pointerx(), self.root.winfo_pointery())
 
     def handle_feedback(self, feedback_type):
@@ -306,12 +306,12 @@ class MixTeXApp:
         text = self.output
         if image and text:
             if self.check_repetition(text):
-                self.log("反馈已记录: Repeat")
+                self.log("Feedback recorded: Repeat")
             else:
                 self.save_data(image, text, feedback_type)
-                self.log(f"反馈已记录: {feedback_type}")
+                self.log(f"Feedback recorded: {feedback_type}")
         else:
-            self.log("反馈无法记录: 缺少图片或者推理输出")
+            self.log("Cannot record feedback: Missing image or inference output")
 
     def add_annotation(self):
         if self.annotation_window is not None:
@@ -330,7 +330,7 @@ class MixTeXApp:
         entry.pack(padx=self.scale_size(10), pady=self.scale_size(10))
         entry.focus_set()
 
-        confirm_button = tk.Button(self.annotation_window, text="确认",
+        confirm_button = tk.Button(self.annotation_window, text="Confirm",
                                    command=lambda: self.confirm_annotation(entry))
         confirm_button.pack(pady=(0, self.scale_size(10)))
 
@@ -343,9 +343,9 @@ class MixTeXApp:
         text = self.output
         if annotation and image and text:
             self.handle_feedback(f"Annotation: {annotation}")
-            self.log(f"标注已添加: {annotation}")
+            self.log(f"Annotation added: {annotation}")
         else:
-            self.log("反馈无法记录: 缺少图片或推理输出或输入标注。")
+            self.log("Cannot record feedback: Missing image, inference output, or annotation input.")
         self.close_annotation()
 
     def update_annotation_position(self):
@@ -368,7 +368,9 @@ class MixTeXApp:
         return False
 
     def mixtex_inference(self, max_length, num_layers, hidden_size, num_attention_heads, batch_size):
-        tokenizer, feature_extractor, encoder_session, decoder_session = self.model
+        if self.model is None:
+            return ""
+        tokenizer, feature_extractor, encoder_session, decoder_session = self.model  # type: ignore
         try:
             generated_text = ""
             head_size = hidden_size // num_attention_heads
@@ -387,15 +389,15 @@ class MixTeXApp:
             }
             for _ in range(max_length):
                 decoder_outputs = decoder_session.run(None, decoder_inputs)
-                next_token_id = np.argmax(decoder_outputs[0][:, -1, :], axis=-1)
+                next_token_id = np.argmax(decoder_outputs[0][:, -1, :], axis=-1)  # type: ignore
                 generated_text += tokenizer.decode(next_token_id, skip_special_tokens=True)
                 self.log(tokenizer.decode(next_token_id, skip_special_tokens=True), end="")
                 if self.check_repetition(generated_text, 21):
-                    self.log('\n===?!重复重复重复!?===\n')
+                    self.log('\n===?!Repetition detected!?===\n')
                     self.save_data(self.current_image, generated_text, 'Repeat')
                     break
                 if next_token_id == tokenizer.eos_token_id:
-                    self.log('\n===成功复制到剪切板===\n')
+                    self.log('\n===Successfully copied to clipboard===\n')
                     break
 
                 decoder_inputs.update({
@@ -432,7 +434,7 @@ class MixTeXApp:
             scale = min(x_img / width, y_img / height)
             new_width = int(width * scale)
             new_height = int(height * scale)
-            img_resized = img.resize((new_width, new_height), Image.LANCZOS)
+            img_resized = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
             x = (x_img - new_width) // 2
             y = (y_img - new_height) // 2
             background.paste(img_resized, (x, y))
@@ -444,8 +446,8 @@ class MixTeXApp:
                 try:
                     image = ImageGrab.grabclipboard()
                     if image is not None and type(image) != list:
-                        self.current_image = self.pad_image(image.convert("RGB"), (448,448))
-                        result = self.mixtex_inference(512, 3, 768, 12, 1)
+                        self.current_image = self.pad_image(image.convert("RGB"), (448,448))  # type: ignore
+                        result = self.mixtex_inference(512, 6, 768, 12, 1)  # Updated to 6 layers
                         result = result.replace('\\[', '\\begin{align*}').replace('\\]', '\\end{align*}').replace('%', '\\%')
                         self.output = result
                         if self.use_dollars_for_inline_math:

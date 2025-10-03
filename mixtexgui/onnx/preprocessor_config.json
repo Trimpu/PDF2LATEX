@@ -1,0 +1,12 @@
+{
+  "do_normalize": true,
+  "do_rescale": true,
+  "do_resize": true,
+  "image_processor_type": "ViTImageProcessor",
+  "resample": 3,
+  "rescale_factor": 0.00392156862745098,
+  "size": {
+    "height": 448,
+    "width": 448
+  }
+}
